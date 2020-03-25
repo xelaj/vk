@@ -14,7 +14,7 @@ go version
 gitlab pipelines
 -->
 
-[english](https://github.com/xelaj/ifttt/blob/master/doc/en_US/README.md) **русский**
+[english](https://github.com/xelaj/vk/blob/master/doc/en_US/README.md) **русский**
 
 Простой способ интегрировать ваше приложение с Вконтакте!
 
@@ -131,4 +131,4 @@ Streaming API был реализован частично в формате pre
 
 ## Лицензия
 
-This project is licensed under the MIT License - see the [LICENSE](https://github.com/xelaj/ifttt/blob/master/doc/ru_RU/LICENSE.md) file for details
+This project is licensed under the MIT License - see the [LICENSE](https://github.com/xelaj/vk/blob/master/doc/ru_RU/LICENSE.md) file for details

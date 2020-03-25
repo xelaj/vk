@@ -14,7 +14,7 @@ go version
 gitlab pipelines
 -->
 
-**english** [русский](https://github.com/xelaj/ifttt/blob/master/doc/ru_RU/README.md)
+**english** [русский](https://github.com/xelaj/vk/blob/master/doc/ru_RU/README.md)
 
 The Simplest way to integrate your app with Vk!
 
@@ -131,4 +131,4 @@ Please read [contributing guide](https://github.com/xelaj/vk/blob/master/doc/en_
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](https://github.com/xelaj/ifttt/blob/master/doc/ru_RU/LICENSE.md) file for details
+This project is licensed under the MIT License - see the [LICENSE](https://github.com/xelaj/vk/blob/master/doc/ru_RU/LICENSE.md) file for details
