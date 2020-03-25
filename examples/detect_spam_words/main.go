@@ -19,14 +19,14 @@ import (
 
 func main() {
 	client, err := vk.NewClient(vk.ClientConfig{
-		ID:         6877441,
-		SecureKey:  "Q22C8d5u15jzkMWSlnpj",
-		ServiceKey: "83e5d90b83e5d90b83e5d90be5838d280a883e583e5d90bdf90b85aca7a73502e4bdd55",
-		KeyStorage: keystorage.NewPrimitive("vk").Set("506331906", "0c057f2f4fde05e3fc06b9e62a0d057805118af63392f7426d99b441e46f62cece2f743aa78669c6b1b6f"),
+		ID:         clientID,
+		SecureKey:  yourAppSecureKey,
+		ServiceKey: yourAppAccessKey,
+		KeyStorage: keystorage.NewPrimitive("vk").Set(userNameInStorage, userKey),
 	})
 	dry.PanicIfErr(err)
 
-	bot, err := longpoll.NewUserBot(client, "506331906")
+	bot, err := longpoll.NewUserBot(client, userNameInStorage)
 	dry.PanicIfErr(err)
 
 	bot.On("new_message", func(item *user.NewMessage) error {
