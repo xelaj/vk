@@ -4,45 +4,28 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"path/filepath"
 	"reflect"
-	"strings"
+	"strconv"
 	"time"
 
-	"gopkg.in/yaml.v2"
-
+	"github.com/ololosha228/keystorage"
 	"github.com/pkg/errors"
 	"github.com/xelaj/vk/response"
 	"github.com/xelaj/vk/types"
 )
 
 type Client struct {
-	id               int
-	secureKey        string
-	serviceKey       string
-	clientTokens     map[int]string
-	groupTokens      map[int]string
-	savedPath        string
-	NeedToSaveTokens bool
-	lastRequest      time.Time
-	tempKey          string         // используется для метода client.By(). после первого запроса сразу же сбрасывается
-	deleteTempKey    bool           // нужно ли заблокировать удаление временного ключа сразу же. по умолчанию true
-	Counters         map[string]int // https://vk.com/dev/data_limits
-}
-
-type File struct {
-	Client struct {
-		Id      int    `yaml:"id"`
-		Seckey  string `yaml:"secure key"`
-		Servkey string `yaml:"service key"`
-	} `yaml:"client"`
-	Tokens struct {
-		Clients map[int]string `yaml:"clients"`
-		Groups  map[int]string `yaml:"groups"`
-	} `yaml:"tokens"`
+	id           int
+	accessKey    string
+	secureKey    string
+	storage      keystorage.Storage
+	lastRequest  time.Time
+	counters     map[string]int // https://vk.com/dev/data_limits
+	parentClient *Client        // при вызове client.By() создается новый инстанс клиента, который возвращает родительский клиент самого приложения
+	err          error
 }
 
 const (
@@ -53,15 +36,24 @@ const (
 	MAX_COUNT_POSTS   = 100
 )
 
-func NewClient(id int, seckey, servkey string) (*Client, error) {
+type ClientConfig struct {
+	ID         int
+	SecureKey  string
+	ServiceKey string
+	KeyStorage keystorage.Storage
+}
+
+func NewClient(config ClientConfig) (*Client, error) {
+	if !config.KeyStorage.HasService("vk") {
+		return nil, errors.New("storage can't handle vk service")
+	}
+
 	app := &Client{
-		id:            id,
-		secureKey:     seckey,
-		serviceKey:    servkey,
-		clientTokens:  make(map[int]string),
-		groupTokens:   make(map[int]string),
-		lastRequest:   time.Unix(0, 0),
-		deleteTempKey: true,
+		id:          config.ID,
+		accessKey:   config.ServiceKey,
+		secureKey:   config.SecureKey,
+		storage:     config.KeyStorage,
+		lastRequest: time.Unix(0, 0),
 	}
 
 	res, err := app.AppsGet(nil)
@@ -73,136 +65,75 @@ func NewClient(id int, seckey, servkey string) (*Client, error) {
 		return nil, errors.New("unknown server-side error")
 	}
 
-	if id != res.Items[0].Id {
-		return nil, errors.New("app is invalid")
-	}
-
-	return app, nil
-}
-
-func LoadClient(path string) (*Client, error) {
-	buf, err := ioutil.ReadFile(path)
-	if err != nil {
-		return nil, errors.Wrap(err, "reading file")
-	}
-
-	var f File
-	if err = yaml.Unmarshal(buf, &f); err != nil {
-		return nil, errors.Wrap(err, "parsing file")
-	}
-
-	app := &Client{
-		id:           f.Client.Id,
-		secureKey:    f.Client.Seckey,
-		serviceKey:   f.Client.Servkey,
-		clientTokens: f.Tokens.Clients,
-		groupTokens:  f.Tokens.Groups,
-		savedPath:    path,
-		lastRequest:  time.Unix(0, 0),
-	}
-	res, err := app.AppsGet(nil)
-	if err != nil {
-		return nil, errors.Wrap(err, "request failed")
-	}
-
-	if len(res.Items) == 0 {
-		return nil, errors.New("unknown server-side error")
-	}
-
-	if f.Client.Id != res.Items[0].Id {
+	if config.ID != res.Items[0].Id {
 		return nil, errors.New("app is invalid")
 	}
 	return app, nil
 }
 
-func (c *Client) SaveTo(path string) error {
-	if path == "" {
-		path = c.savedPath
+func (c *Client) RootClient() *Client {
+	if c.parentClient != nil {
+		return c.parentClient.RootClient()
 	}
-
-	var f File
-	f.Client.Id = c.id
-	f.Client.Seckey = c.secureKey
-	f.Client.Servkey = c.serviceKey
-	f.Tokens.Clients = c.clientTokens
-	f.Tokens.Groups = c.groupTokens
-
-	res, _ := yaml.Marshal(&f)
-	return ioutil.WriteFile(path, res, 0666)
-}
-
-func (c *Client) ByClient(userId int) types.Client {
-	return types.Client(c.By(userId))
-}
-
-func (c *Client) DisableTempTokenDeleting() {
-	c.deleteTempKey = false
-}
-
-func (c *Client) EnableTempTokenDeleting() {
-	c.deleteTempKey = false
-}
-
-func (c *Client) ForceDeleteTempToken() {
-	c.tempKey = ""
+	return c
 }
 
 // согласно документации vk api любые положительные id считаются пользователями,
 // а отрицательные — группами. здесь все реализовано идентично, поскольку нет иной
 // возможности сделать как-то более удобно и очевидно
-func (c *Client) By(userId int) *Client {
-	if userId >= 0 {
-		token, ok := c.clientTokens[userId]
-		if !ok {
-			token = ""
-			fmt.Printf("WARNING! You don't have %v user token!\n", userId)
+func (c *Client) By(user string) *Client {
+	root := c.RootClient()
+
+	key, err := root.storage.UserKey(user, "vk")
+	if err != nil {
+		return &Client{
+			err: errors.Wrap(err, "finding user"),
 		}
-		c.tempKey = token
-		return c
-	} else {
-		userId = -userId
-		token, ok := c.groupTokens[userId]
-		if !ok {
-			token = ""
-			fmt.Printf("WARNING! You don't have %v group token!\n", userId)
-		}
-		c.tempKey = token
-		return c
+	}
+
+	return &Client{
+		parentClient: root,
+		accessKey:    key,
 	}
 }
 
+func (c *Client) ConvertToID(user string) (int, error) {
+	idStr, err := c.RootClient().storage.ServiceID("vk", user)
+	if err != nil {
+		return 0, errors.Wrap(err, "getting service user id")
+	}
+	return strconv.Atoi(idStr)
+}
+
 func (c *Client) RawMethod(method string, params map[string]interface{}, storeTo interface{}) (*response.Basic, error) {
-	methodName := strings.Split(method, "#")[0]
+	if c.err != nil {
+		return nil, c.err
+	}
 
 	if params == nil {
 		params = make(map[string]interface{})
 	}
 
 	if v, ok := params["access_token"]; !ok || v == "" {
-		if c.tempKey != "" {
-			params["access_token"] = c.tempKey
-			if c.deleteTempKey {
-				c.tempKey = ""
-			}
-		} else {
-			params["access_token"] = c.serviceKey
+		if c.accessKey != "" {
+			params["access_token"] = c.accessKey
 		}
 	}
+	c.wait() // чтобы не словить таймаут
 
-	c.wait()
-
-	i, e := rawMethod(methodName, params)
-	if e != nil {
-		return nil, errors.Wrap(e, "request failed")
+	body, err := rawMethod(method, params)
+	if err != nil {
+		return nil, errors.Wrap(err, "request failed")
 	}
 
 	data := response.New(reflect.TypeOf(storeTo))
 
-	e = json.NewDecoder(i).Decode(data)
-	i.Close()
-	if e != nil {
-		return nil, errors.Wrap(e, "json parsing error")
+	err = json.NewDecoder(body).Decode(data)
+	body.Close()
+	if err != nil {
+		return nil, errors.Wrap(err, "json parsing error")
 	}
+
 	return data, data.Err()
 }
 
@@ -215,7 +146,7 @@ func (c *Client) wait() {
 	}
 }
 
-func (c *Client) client() types.Client {
+func (c *Client) Client() types.Client {
 	return types.Client(c)
 }
 
@@ -248,7 +179,6 @@ func rawMethod(methodName string, params map[string]interface{}) (io.ReadCloser,
 		resp, err = http.PostForm(u.String(), q)
 	} else {
 		u.RawQuery = encoded
-		// println(u.String())
 		resp, err = http.Get(u.String())
 	}
 

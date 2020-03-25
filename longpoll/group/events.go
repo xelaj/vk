@@ -1,4 +1,4 @@
-package longpoll
+package group
 
 import (
 	"reflect"
@@ -6,7 +6,10 @@ import (
 	"github.com/xelaj/vk/types"
 )
 
-type MessageNew = types.Message
+type MessageNew struct {
+	Message    *types.Message    `json:"message"`
+	ClientInfo *types.ClientInfo `json:"client_info"`
+}
 type MessageReply = types.Message
 type MessageEdit = types.Message
 
@@ -201,10 +204,6 @@ var (
 )
 
 func validAction(name string) bool {
-	for v := range UpdateTypes {
-		if name == v {
-			return true
-		}
-	}
-	return false
+	_, ok := UpdateTypes[name]
+	return ok
 }

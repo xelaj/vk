@@ -28,7 +28,7 @@ func (c *Client) OauthUrl(permissions types.UserPermissions) string {
 	return u.String()
 }
 
-func (c *Client) AuthUser(token string) error {
+func (c *Client) AuthUser(name, token string) error {
 	if strings.HasPrefix(token, "https://oauth.vk.com") {
 		u, err := url.Parse(token)
 		if err != nil {
@@ -44,34 +44,50 @@ func (c *Client) AuthUser(token string) error {
 		if token == "" {
 			return errors.New("token not found in url")
 		}
-
-		user := v.Get("user_id")
-		if user != "" {
-			i, _ := strconv.Atoi(user)
-			c.clientTokens[i] = token
-		}
-		return nil
 	}
 
+	userIdString, err := c.storage.ServiceID("vk", name)
+	if err != nil {
+		return errors.Wrap(err, "getting service user id")
+	}
+	uid, err := strconv.Atoi(userIdString)
+	if err != nil {
+		return errors.New("service user id is not value")
+	}
+
+	_, err = c.AccountGetAppPermissions(uid)
+	if err != nil {
+		return errors.Wrap(err, "checking token validity")
+	}
+
+	return c.auth(name, token)
+}
+
+func (c *Client) AuthGroup(group, token string) error {
+	tmpClient := &Client{
+		parentClient: c,
+		accessKey:    token,
+	}
+
+	_, err := tmpClient.GroupsGetTokenPermissions()
+	if err != nil {
+		return errors.Wrap(err, "checking token validity")
+	}
+
+	return c.auth(group, token)
+}
+
+func (c *Client) auth(id, token string) error {
 	for _, r := range token {
 		if (r < '0' || r > '9') && (r < 'a' || r > 'f') {
 			return errors.New("token is invalid")
 		}
 	}
-	if c.NeedToSaveTokens {
-		c.SaveTo("")
-	}
-	return nil
-}
 
-func (c *Client) AuthGroup(groupID int, token string) error {
-	c.groupTokens[groupID] = token
-
-	// test
-	_, err := c.By(-groupID).GroupsGetTokenPermissions()
+	err := c.storage.AuthService("vk", id, token)
 	if err != nil {
-		delete(c.groupTokens, groupID)
-		return errors.Wrap(err, "checking group token")
+		return errors.Wrap(err, "saving token")
+
 	}
 
 	return nil

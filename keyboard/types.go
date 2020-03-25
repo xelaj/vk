@@ -60,6 +60,7 @@ func Pay(payload, hash string) *Button {
 	return b
 }
 
+// onetime нужно ли скрывать клавиатуру при нажатии на кнопку
 func New(onetime bool, rows ...[]*Button) *Keyboard {
 	if len(rows) > 10 && len(rows) < 1 {
 		panic("keyboard can contain rows in count [1:10]")

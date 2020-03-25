@@ -5,6 +5,8 @@
 
 package types
 
+// Permissions объявляет общие методы для всех разрешений, поскольку перечисления разрешений
+// между пользовательскими и групповыми параметрами не совпадают полностью
 type Permissions interface {
 	Type() TokenType
 	Bitmask() int
@@ -41,13 +43,14 @@ const (
 )
 
 func (t TokenType) String() string {
-	if t == UserToken {
+	switch t {
+	case UserToken:
 		return "<vk_token: user>"
-	}
-	if t == CommunityToken {
+	case CommunityToken:
 		return "<vk_token: community>"
+	default:
+		return "<vk_token: unknown>"
 	}
-	return "<vk_token: unknown>"
 }
 
 type UserPermissions int
@@ -82,6 +85,30 @@ const (
 	_
 	_
 	UPermMarket
+)
+
+const (
+	// UPermAllTogether не включает UPermMessages
+	UPermAllTogether = UPermNotify +
+		UPermFriends +
+		UPermPhotos +
+		UPermAudio +
+		UPermVideo +
+		UPermStories +
+		UPermPages +
+		UPermLeftLinks +
+		UPermStatus +
+		UPermNotes +
+		//UPermMessages +
+		UPermWall +
+		UPermAds +
+		UPermOffline +
+		UPermDocs +
+		UPermGroups +
+		UPermNotifications +
+		UPermStats +
+		UPermEmail +
+		UPermMarket
 )
 
 // type Permissions int

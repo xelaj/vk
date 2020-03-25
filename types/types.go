@@ -4,10 +4,7 @@ import "github.com/xelaj/vk/response"
 
 type Client interface {
 	RawMethod(method string, params map[string]interface{}, storeTo interface{}) (*response.Basic, error)
-	ByClient(int) Client
-	DisableTempTokenDeleting()
-	EnableTempTokenDeleting()
-	ForceDeleteTempToken()
+	Client() Client
 }
 
 type AttachmentPlace struct {

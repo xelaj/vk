@@ -68,6 +68,10 @@ const (
 	ErrEnableChatbotFeatures       = 912
 	ErrTooManyForwardedMessages    = 913
 	ErrMessageIsTooLong            = 914
+	ErrConversationsDisabled       = 915
+	ErrConversationsBLocked        = 916
+	ErrNoAccessToChat              = 917
+	ErrNoAccessToEmail             = 918
 	ErrWebsocketUpgradeExpected    = 1000
 	ErrWrongHttpMethod             = 1001
 	ErrWrongContentType            = 1002

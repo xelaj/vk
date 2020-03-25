@@ -34,9 +34,7 @@ func AccountGetBanned(c types.Client, offset, count int) (*AccountGetBannedRespo
 	if count < 0 {
 		count = 2<<31 - 1
 	}
-
 	result := new(AccountGetBannedResponse)
-	c.DisableTempTokenDeleting()
 	for ; offset < count; offset += accountGetBannedMaxCount {
 		params := map[string]interface{}{
 			"offset": offset,
@@ -57,8 +55,6 @@ func AccountGetBanned(c types.Client, offset, count int) (*AccountGetBannedRespo
 		result.Items = append(result.Items, t.Items...)
 		result.Profiles = append(result.Profiles, t.Profiles...)
 	}
-	c.EnableTempTokenDeleting()
-	c.ForceDeleteTempToken()
 
 	return result, nil
 }

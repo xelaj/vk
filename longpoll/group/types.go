@@ -1,4 +1,4 @@
-package longpoll
+package group
 
 import (
 	"encoding/json"
